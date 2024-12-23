@@ -4,7 +4,8 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MemorySaver } from '@langchain/langgraph';
 import { TavilySearchResults } from '@langchain/community/tools/tavily_search';
 import * as dotenv from 'dotenv';
-// import { WalletScoringTool } from './transaction';
+import { ScoringWalletKit } from './scoringWallet';
+import { walletScoringTool } from './transaction';
 
 dotenv.config();
 
@@ -23,14 +24,17 @@ async function initializeAgent() {
 	});
 
 	const solanaKit = new SolanaAgentKit(solanaPrivateKey!, rpcUrl, openAIKey!);
+	const scoringWalletKit = new ScoringWalletKit(rpcUrl!);
 
 	const solanaTools = createSolanaTools(solanaKit);
+	const scoringTools = walletScoringTool(scoringWalletKit);
 
 	const tools = [
 		...solanaTools,
-		// new WalletScoringTool(),
 		new TavilySearchResults({ maxResults: 3, apiKey: tavilyKey }),
+		...scoringTools,
 	];
+
 	const memory = new MemorySaver();
 
 	return createReactAgent({

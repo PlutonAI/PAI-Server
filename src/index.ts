@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
-app.use(cors({ origin: process.env.CLIENT_URL, methods: ['GET', 'POST'] }));
+app.use(cors());
 
 const server = app.listen(PORT, () => console.log(`Server on port ${PORT}`));
 
@@ -20,12 +20,12 @@ const io = new SocketIOServer(server, {
 });
 
 const onConnected = async (socket: Socket) => {
-	console.log('A user connected');
-	console.log('Socket Id: ', socket.id);
+	console.log(`A user connected: ${socket.id}`);
 
 	const agent = await initializeAgent();
 
 	async function runChat(message: string) {
+		console.log('received_message: ', message);
 		const config = { configurable: { thread_id: 'Solana Agent Kit!' } };
 
 		// Send a command to the agent
@@ -50,12 +50,10 @@ const onConnected = async (socket: Socket) => {
 		return aiResponse;
 	}
 
-	socket.on('message', async (data) => {
-		console.log('Received message:', data);
-
+	socket.on('send_message', async (data) => {
 		const aiResponse = await runChat(data);
 
-		socket.emit('message', aiResponse);
+		socket.emit('received_message', aiResponse);
 	});
 
 	socket.on('disconnect', () => {

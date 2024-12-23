@@ -1,4 +1,53 @@
-import { ParsedTransactionWithMeta, TokenBalance } from '@solana/web3.js';
+import {
+	Connection,
+	ParsedTransactionWithMeta,
+	PublicKey,
+	TokenBalance,
+} from '@solana/web3.js';
+import { ScoringWalletKit } from '../scoringWallet';
+
+// Helper: Normalize a value between 0 and 1
+export function normalize_value(value: number, max: number): number {
+	return Math.min(value / max, 1);
+}
+
+// Helper: Fetch transactions for a wallet
+export async function fetch_tx(
+	agent: ScoringWalletKit,
+	walletAddress: PublicKey,
+	amountOfTx?: number,
+) {
+	try {
+		// Fetch the transaction signatures
+		const signatures = await agent.connection.getSignaturesForAddress(
+			walletAddress,
+			{
+				limit: amountOfTx ?? 10,
+			},
+		);
+
+		if (signatures.length === 0) {
+			console.log('No transactions found for this wallet.');
+			return [];
+		}
+
+		const signatureAddresses: string[] = signatures.map(
+			(signature) => signature.signature,
+		);
+
+		const transactions: (ParsedTransactionWithMeta | null)[] = [];
+		for (const signature of signatureAddresses) {
+			const tx = await agent.connection.getParsedTransaction(signature, {
+				maxSupportedTransactionVersion: 0,
+			});
+			transactions.push(tx);
+		}
+		agent.transactions = transactions;
+	} catch (error) {
+		console.error('Error fetching transactions:', error);
+		throw new Error('Failed to fetch transactions');
+	}
+}
 
 // List of stablecoin mint addresses (SPL tokens)
 const stablecoinMints = new Set([
@@ -7,9 +56,8 @@ const stablecoinMints = new Set([
 ]);
 
 // Metric: Calculate transaction frequency
-function calculateTransactionFrequency(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_tx_freq(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
 	if (transactions.length === 0) return 0;
 
 	// Sort transactions by timestamp to determine the time window
@@ -32,10 +80,13 @@ function calculateTransactionFrequency(
 }
 
 // Metric: Calculate volume traded in SOL (simple calculation)
-function calculateVolume(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_vol(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
+
+	if (transactions.length === 0) return 0;
+
 	let totalVolume = 0;
+
 	transactions.forEach((tx) => {
 		if (tx && tx.meta) {
 			const solChange =
@@ -47,10 +98,13 @@ function calculateVolume(
 }
 
 // Metric: Estimate profitability (simplified PnL calculation)
-function calculateProfitability(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_profitability(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
+
+	if (transactions.length === 0) return 0;
+
 	let profit = 0;
+
 	transactions.forEach((tx) => {
 		// Analyze token movements to infer profitability (placeholder logic)
 		if (tx && tx.meta) {
@@ -63,9 +117,11 @@ function calculateProfitability(
 }
 
 // Metric: Calculate DEX interaction diversity
-function calculateDexDiversity(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_dex_diversity(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
+
+	if (transactions.length === 0) return 0;
+
 	const dexPrograms = new Set<string>();
 
 	transactions.forEach((tx) => {
@@ -86,9 +142,11 @@ function calculateDexDiversity(
 }
 
 // Metric: Calculate stablecoin volume
-function calculateStablecoinVolume(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_stabel_token_vol(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
+
+	if (transactions.length === 0) return 0;
+
 	let stablecoinVolume = 0;
 
 	transactions.forEach((tx) => {
@@ -119,9 +177,9 @@ function calculateStablecoinVolume(
 }
 
 // Metric: Avoidance of risky contracts
-function calculateRiskyContractScore(
-	transactions: (ParsedTransactionWithMeta | null)[],
-): number {
+export function calc_risky_contract(agent: ScoringWalletKit): number {
+	const transactions = agent.transactions;
+
 	const flaggedContracts = new Set([
 		'FlaggedProgramId1',
 		'FlaggedProgramId2', //TODO: Add actual flagged program IDs
@@ -150,14 +208,7 @@ function calculateRiskyContractScore(
 }
 
 // Helper: Calculate the overall score of a wallet
-function calculateScore(metrics: {
-	frequency: number;
-	volume: number;
-	profitability: number;
-	dexDiversity: number;
-	stablecoinActivity: number;
-	riskyContracts: number;
-}): number {
+export function calc_final_score(agent: ScoringWalletKit): number {
 	const weights = {
 		frequency: 0.1,
 		volume: 0.2,
@@ -166,22 +217,23 @@ function calculateScore(metrics: {
 		stablecoinActivity: 0.1,
 		riskyContracts: 0.2,
 	};
+
+	const frequency = normalize_value(agent.calcTxFreq(), 100);
+	const volume = normalize_value(agent.calcVol(), 1000);
+	const profitability = normalize_value(agent.calcProfitability(), 100);
+	const dexDiversity = normalize_value(agent.calcDexDiversity(), 10);
+	const stablecoinActivity = normalize_value(
+		agent.calcStableTokenVol(),
+		1000,
+	);
+	const riskyContracts = agent.calcRiskContract();
+
 	return (
-		metrics.frequency * weights.frequency +
-		metrics.volume * weights.volume +
-		metrics.profitability * weights.profitability +
-		metrics.dexDiversity * weights.dexDiversity +
-		metrics.stablecoinActivity * weights.stablecoinActivity +
-		metrics.riskyContracts * weights.riskyContracts
+		frequency * weights.frequency +
+		volume * weights.volume +
+		profitability * weights.profitability +
+		dexDiversity * weights.dexDiversity +
+		stablecoinActivity * weights.stablecoinActivity +
+		riskyContracts * weights.riskyContracts
 	);
 }
-
-export {
-	calculateDexDiversity,
-	calculateProfitability,
-	calculateRiskyContractScore,
-	calculateScore,
-	calculateStablecoinVolume,
-	calculateTransactionFrequency,
-	calculateVolume,
-};
