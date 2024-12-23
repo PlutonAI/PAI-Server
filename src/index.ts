@@ -3,18 +3,16 @@ import cors from 'cors';
 import { Socket, Server as SocketIOServer } from 'socket.io';
 import { initializeAgent } from './agent';
 import { HumanMessage } from '@langchain/core/messages';
-import { Server as HttpServer } from 'http';
+import http from 'http';
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use();
+app.use(cors());
 
-const server = app.listen(port, () => {
-	console.log(`Server running on port ${port}`);
-});
+const server = http.createServer(app);
 
-const io = new SocketIOServer(server as HttpServer, {
+const io = new SocketIOServer(server, {
 	cors: {
 		origin: '*', // Allow all origins
 		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -65,3 +63,7 @@ const onConnected = async (socket: Socket) => {
 };
 
 io.on('connection', onConnected);
+
+server.listen(port, () => {
+	console.log(`Server running on port ${port}`);
+});
