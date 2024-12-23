@@ -5,12 +5,14 @@ import { initializeAgent } from './agent';
 import { HumanMessage } from '@langchain/core/messages';
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cors());
 
-const server = app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+const server = app.listen(port, () => {
+	console.log(`Server running on port ${port}`);
+});
 
 const io = new SocketIOServer(server, {
 	cors: {
