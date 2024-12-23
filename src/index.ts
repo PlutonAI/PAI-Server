@@ -8,12 +8,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(
-	cors({
-		origin: '*',
-		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-	}),
-);
+app.use();
 
 const server = app.listen(port, () => {
 	console.log(`Server running on port ${port}`);
@@ -24,6 +19,7 @@ const io = new SocketIOServer(server as HttpServer, {
 		origin: '*', // Allow all origins
 		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 	},
+	transports: ['websocket', 'polling'],
 });
 
 const onConnected = async (socket: Socket) => {
