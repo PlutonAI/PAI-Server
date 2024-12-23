@@ -8,25 +8,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(
-	cors({
-		origin: [process.env.CLIENT_URL!, 'http://localhost:3000'],
-		credentials: true,
-		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-		allowedHeaders: ['Content-Type', 'Authorization'],
-	}),
-);
 
 const server = app.listen(port, () => {
 	console.log(`Server running on port ${port}`);
 });
 
-const io = new SocketIOServer(server, {
-	cors: {
-		origin: process.env.CLIENT_URL!,
-		methods: ['GET', 'POST'],
-	},
-});
+const io = new SocketIOServer(server);
 
 const onConnected = async (socket: Socket) => {
 	console.log(`A user connected: ${socket.id}`);
